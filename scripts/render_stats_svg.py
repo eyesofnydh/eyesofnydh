@@ -1,15 +1,6 @@
 #!/usr/bin/env python3
-"""
-Render the streak / numbers card from data/contributions.json (written daily by
-fetch_contributions.py) as a terminal-window SVG.
+"""Render a compact, readable GitHub activity card from contribution data."""
 
-Six stat tiles slide in and their numbers count up to the real value, then a
-monthly-contributions bar chart grows in underneath. The count-up is a stack of
-pre-rendered frames toggled with SMIL <set>, since GitHub runs SMIL/CSS inside
-<img> SVGs but never JS.
-
-    python scripts/render_stats_svg.py [data.json] [output.svg]
-"""
 import datetime
 import html
 import json
@@ -20,153 +11,102 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "data", "contributions.json")
 OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, "..", "stats.svg")
 
-BG = "#0d1117"
-BG2 = "#111722"
-TILE = "#161b22"
-FRAME = "#30363d"
-MUTED = "#7d8590"
-INK = "#e6edf3"
+W, H = 840, 540
+PAD, GAP = 26, 18
+TILE_W = (W - 2 * PAD - GAP) / 2
+TILE_H = 164
+TILES_TOP = 112
+BG = "#09131c"
+TILE = "#10212b"
+BORDER = "#2b4c50"
+TEXT = "#f2fbfa"
+MUTED = "#9abbbd"
 GREEN = "#39d353"
-BAR = "#26a641"
-
-W, H = 840, 880
-PAD = 20
-TITLEBAR_H = 30
-COLS, ROWS = 2, 3
-GAP = 16
-TILE_W = (W - PAD * 2 - GAP * (COLS - 1)) / COLS
-TILE_H = 150
-TILES_TOP = TITLEBAR_H + PAD + 4
-CHART_TOP = TILES_TOP + ROWS * TILE_H + (ROWS - 1) * GAP + GAP
-
-# timing (seconds)
-TILE_STAGGER = 0.15
-SLIDE_DUR = 0.45
-COUNT_DUR = 1.2
-FRAMES = 16
-BAR_START = TILE_STAGGER * COLS * ROWS + 0.4
-BAR_STAGGER = 0.06
-BAR_DUR = 0.6
+CYAN = "#4fe1d7"
 
 
-def short(d):
-    parsed = datetime.date.fromisoformat(d)
-    return f"{parsed:%b} {parsed.day}"
+def short(date_string):
+    day = datetime.date.fromisoformat(date_string)
+    return f"{day:%b} {day.day}"
 
 
-def span(s):
-    return f'{short(s["start"])} – {short(s["end"])}' if s["length"] else "—"
+def streak_caption(streak):
+    if not streak["length"] or not streak["start"] or not streak["end"]:
+        return "Your next run starts here"
+    if streak["start"] == streak["end"]:
+        return short(streak["end"])
+    return f'{short(streak["start"])} – {short(streak["end"])}'
 
 
-with open(SRC, encoding="utf-8") as source:
-    data = json.load(source)
-username = html.escape(data["username"])
-cur, lng, best = data["current_streak"], data["longest_streak"], data["best_day"]
-n_days = len(data["days"])
+def render(data):
+    username = html.escape(data["username"])
+    current = data["current_streak"]
+    longest = data["longest_streak"]
+    best = data["best_day"]
+    tiles = [
+        ("01 / CONTRIBUTIONS", data["total_contributions"], "", "in the last year", GREEN),
+        ("02 / CURRENT STREAK", current["length"], "day" if current["length"] == 1 else "days", streak_caption(current), CYAN),
+        ("03 / ACTIVE DAYS", data["active_days"], "days", "in the last year", CYAN),
+        ("04 / LONGEST STREAK", longest["length"], "day" if longest["length"] == 1 else "days", streak_caption(longest), GREEN),
+    ]
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img">',
+        f'<title>GitHub activity for {username}</title>',
+        f'<desc>{data["total_contributions"]} contributions, {data["active_days"]} active days, '
+        f'{current["length"]} day current streak, {longest["length"]} day longest streak.</desc>',
+        '<style>.tile{animation:rise .5s ease-out both}'
+        '@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}'
+        '@media (prefers-reduced-motion:reduce){.tile{animation:none}}</style>',
+        '<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#09131c"/>'
+        '<stop offset="1" stop-color="#0b2730"/></linearGradient></defs>',
+        f'<rect width="{W}" height="{H}" rx="18" fill="url(#bg)"/>',
+        f'<rect x="1" y="1" width="{W-2}" height="{H-2}" rx="17" fill="none" stroke="{BORDER}"/>',
+        f'<path d="M0 44H{W}" stroke="{BORDER}"/>',
+    ]
+    for i, color in enumerate(("#ff6b6b", "#f5c451", "#39d353")):
+        parts.append(f'<circle cx="{PAD + i * 17}" cy="22" r="5" fill="{color}"/>')
+    parts.extend([
+        f'<text x="{W/2}" y="28" fill="{MUTED}" text-anchor="middle" '
+        f'font-family="Consolas,Menlo,monospace" font-size="14">{username}@github:~$ ./stats</text>',
+        f'<text x="{PAD}" y="88" fill="{TEXT}" font-family="Segoe UI,Arial,sans-serif" '
+        'font-size="30" font-weight="800">THE NUMBERS</text>',
+        f'<text x="{W-PAD}" y="86" fill="{CYAN}" text-anchor="end" '
+        'font-family="Consolas,Menlo,monospace" font-size="15">LIVE GITHUB DATA</text>',
+    ])
+    for index, (label, value, unit, caption, accent) in enumerate(tiles):
+        col, row = index % 2, index // 2
+        x = PAD + col * (TILE_W + GAP)
+        y = TILES_TOP + row * (TILE_H + GAP)
+        font_size = 64 if len(f"{value:,}") > 5 else 72
+        parts.extend([
+            f'<g class="tile" style="animation-delay:{index * .12:.2f}s">',
+            f'<rect x="{x:.1f}" y="{y}" width="{TILE_W:.1f}" height="{TILE_H}" rx="14" fill="{TILE}" stroke="{BORDER}"/>',
+            f'<rect x="{x:.1f}" y="{y+18}" width="4" height="{TILE_H-36}" rx="2" fill="{accent}"/>',
+            f'<text x="{x+24:.1f}" y="{y+34}" fill="{MUTED}" font-family="Consolas,Menlo,monospace" '
+            f'font-size="19">{label}</text>',
+            f'<text x="{x+24:.1f}" y="{y+111}" fill="{TEXT}" font-family="Segoe UI,Arial,sans-serif" '
+            f'font-size="{font_size}" font-weight="800">{value:,}'
+            f'<tspan fill="{accent}" font-size="24" font-weight="600"> {unit}</tspan></text>',
+            f'<text x="{x+24:.1f}" y="{y+143}" fill="{MUTED}" font-family="Segoe UI,Arial,sans-serif" '
+            f'font-size="19">{html.escape(caption)}</text>',
+            '</g>',
+        ])
+    best_caption = f'{best["count"]} contribution' + ('' if best["count"] == 1 else 's')
+    parts.extend([
+        f'<path d="M{PAD} 486H{W-PAD}" stroke="{BORDER}"/>',
+        f'<text x="{PAD}" y="516" fill="{MUTED}" font-family="Consolas,Menlo,monospace" font-size="16">'
+        f'BEST DAY <tspan fill="{GREEN}">{best_caption.upper()}</tspan> · {short(best["date"]).upper()}</text>',
+        f'<text x="{W-PAD}" y="516" fill="{MUTED}" text-anchor="end" '
+        'font-family="Consolas,Menlo,monospace" font-size="16">UPDATED DAILY</text>',
+        '</svg>',
+    ])
+    return ''.join(parts)
 
-# (label, value, suffix, caption, accent)
-tiles = [
-    ("current streak", cur["length"], " days", span(cur), GREEN),
-    ("longest streak", lng["length"], " days", span(lng), INK),
-    ("contributions", data["total_contributions"], "", "in the last year", INK),
-    ("active days", data["active_days"], f" / {n_days}", f'{data["active_days"] / n_days:.0%} of the year' if n_days else "no data yet", INK),
-    ("best day", best["count"], "", short(best["date"]), INK),
-    ("avg / active day", data["avg_per_active_day"], "", "contributions", INK),
-]
 
-
-def fmt(v, like):
-    return f"{v:,.1f}" if isinstance(like, float) else f"{int(round(v)):,}"
-
-
-parts = [
-    f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
-    f'font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">',
-    '<style>'
-    f'.t{{animation:in {SLIDE_DUR}s ease-out both}}'
-    '@keyframes in{0%{opacity:0;transform:translateY(14px)}100%{opacity:1;transform:translateY(0)}}'
-    f'.b{{transform-box:fill-box;transform-origin:bottom;animation:grow {BAR_DUR}s ease-out both}}'
-    '@keyframes grow{to{transform:scaleY(1)}}'
-    '@media (prefers-reduced-motion: reduce){.t,.b{opacity:1!important;transform:none!important;animation:none!important}}'
-    '</style>',
-    f'<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
-    f'<stop offset="0" stop-color="{BG2}"/><stop offset="1" stop-color="{BG}"/></linearGradient></defs>',
-    f'<rect width="{W}" height="{H}" rx="12" fill="url(#bg)"/>',
-    f'<rect x="0.5" y="0.5" width="{W-1}" height="{H-1}" rx="12" fill="none" stroke="{FRAME}"/>',
-    f'<line x1="0" y1="{TITLEBAR_H}" x2="{W}" y2="{TITLEBAR_H}" stroke="{FRAME}"/>',
-]
-for i, dot in enumerate(["#ff5f56", "#ffbd2e", "#27c93f"]):
-    parts.append(f'<circle cx="{PAD + i*16}" cy="{TITLEBAR_H/2}" r="5" fill="{dot}"/>')
-parts.append(f'<text x="{W/2}" y="{TITLEBAR_H/2 + 4}" fill="{MUTED}" font-size="12" '
-             f'text-anchor="middle">{username}@github: ~$ ./stats.sh</text>')
-
-# ---- stat tiles ----------------------------------------------------------
-for i, (label, value, suffix, caption, accent) in enumerate(tiles):
-    col, row = i % COLS, i // COLS
-    x = PAD + col * (TILE_W + GAP)
-    y = TILES_TOP + row * (TILE_H + GAP)
-    start = i * TILE_STAGGER
-    count_start = start + SLIDE_DUR * 0.6
-
-    parts.append(f'<g class="t" style="animation-delay:{start:.2f}s">')
-    parts.append(f'<rect x="{x:.1f}" y="{y}" width="{TILE_W:.1f}" height="{TILE_H}" rx="10" '
-                 f'fill="{TILE}" stroke="{FRAME}"/>')
-    parts.append(f'<text x="{x+24:.1f}" y="{y+40}" fill="{MUTED}" font-size="22">$ {label}</text>')
-
-    # count-up frames: ease-out so it decelerates into the real number
-    num_y = y + 100
-    parts.append(
-        f'<text x="{x+24:.1f}" y="{num_y}" font-size="54" font-weight="700" fill="{accent}">'
-        f'{fmt(value, value)}<tspan font-size="24" font-weight="400" fill="{MUTED}">{suffix}</tspan></text>'
-    )
-    for k in range(1, FRAMES + 1):
-        p = k / FRAMES
-        v = value * (1 - (1 - p) ** 3)
-        t_on = count_start + COUNT_DUR * (k - 1) / FRAMES
-        t_off = count_start + COUNT_DUR * k / FRAMES
-        anim = f'<set attributeName="opacity" to="1" begin="{t_on:.3f}s"/>'
-        if k < FRAMES:
-            anim += f'<set attributeName="opacity" to="0" begin="{t_off:.3f}s"/>'
-        parts.append(
-            f'<text x="{x+24:.1f}" y="{num_y}" opacity="0" font-size="54" font-weight="700" fill="{accent}">'
-            f'{fmt(v, value)}<tspan font-size="24" font-weight="400" fill="{MUTED}">{suffix}</tspan>'
-            f'{anim}</text>'
-        )
-    parts.append(f'<text x="{x+24:.1f}" y="{y+132}" fill="{MUTED}" font-size="20">{caption}</text>')
-    parts.append('</g>')
-
-# ---- monthly bars --------------------------------------------------------
-monthly = data["monthly"]
-chart_x, chart_w = PAD, W - PAD * 2
-chart_h = H - PAD - CHART_TOP
-parts.append(f'<g class="t" style="animation-delay:{BAR_START - 0.3:.2f}s">')
-parts.append(f'<rect x="{chart_x}" y="{CHART_TOP}" width="{chart_w}" height="{chart_h}" rx="10" '
-             f'fill="{TILE}" stroke="{FRAME}"/>')
-parts.append(f'<text x="{chart_x+24}" y="{CHART_TOP+40}" fill="{MUTED}" font-size="22">$ contributions / month</text>')
-parts.append('</g>')
-
-plot_top = CHART_TOP + 64
-plot_bot = CHART_TOP + chart_h - 40
-plot_l, plot_r = chart_x + 24, chart_x + chart_w - 24
-slot = (plot_r - plot_l) / max(len(monthly), 1)
-bar_w = slot * 0.62
-peak = max((m["total"] for m in monthly), default=0) or 1
-for i, m in enumerate(monthly):
-    h = max(2, (plot_bot - plot_top) * m["total"] / peak)
-    bx = plot_l + i * slot + (slot - bar_w) / 2
-    fill = GREEN if m["total"] == peak else BAR
-    delay = BAR_START + i * BAR_STAGGER
-    parts.append(f'<rect class="b" x="{bx:.1f}" y="{plot_bot - h:.1f}" width="{bar_w:.1f}" height="{h:.1f}" '
-                 f'rx="3" fill="{fill}" style="animation-delay:{delay:.2f}s"/>')
-    mon = datetime.date.fromisoformat(m["month"] + "-01").strftime("%b")[0]
-    parts.append(f'<text x="{bx + bar_w/2:.1f}" y="{plot_bot + 28}" fill="{MUTED}" font-size="18" '
-                 f'text-anchor="middle">{mon}</text>')
-    if m["total"] == peak:
-        parts.append(f'<text class="t" style="animation-delay:{delay + BAR_DUR:.2f}s" x="{bx + bar_w/2:.1f}" '
-                     f'y="{plot_bot - h - 10:.1f}" fill="{INK}" font-size="18" text-anchor="middle">{peak:,}</text>')
-
-parts.append('</svg>')
-svg = "".join(parts)
-with open(OUT, "w", encoding="utf-8") as output:
-    output.write(svg)
-print(f"wrote {OUT}: {W} x {H}, {len(svg)//1024} KB")
+if __name__ == "__main__":
+    with open(SRC, encoding="utf-8") as source:
+        data = json.load(source)
+    svg = render(data)
+    with open(OUT, "w", encoding="utf-8") as output:
+        output.write(svg)
+    print(f"wrote {OUT}: {W} x {H}, {len(svg)//1024} KB")

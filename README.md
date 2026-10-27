@@ -1,50 +1,45 @@
 <div align="center">
 
-<img src="./profile-banner.svg" width="100%" alt="Nidhin Narayanan — Testing Engineer, focused on thoughtful software quality" />
+<img src="./profile-banner.svg" width="100%" alt="Nidhin Narayanan — Testing Engineer" />
 
-### Testing Engineer at Webandcrafts
+<br />
 
-I find the cracks before release. I test web and mobile products, then turn useful findings into repeatable checks.
+<img src="./assets/avatar.png" width="156" alt="Nidhin's GitHub avatar" />
 
-[![Portfolio](https://img.shields.io/badge/Portfolio-nidhinn.online-15b8a6?style=for-the-badge&logo=vercel&logoColor=white)](https://nidhinn.online)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/nidhin-narayanan/)
-[![Email](https://img.shields.io/badge/Email-Say_hello-334155?style=for-the-badge&logo=gmail&logoColor=white)](mailto:nidhinxnarayanan@gmail.com)
+<h3>Testing Engineer at Webandcrafts</h3>
+
+<p>I find the cracks before release, then turn the useful lessons into repeatable checks.</p>
+
+<p><a href="https://nidhinn.online">Portfolio ↗</a> &nbsp;·&nbsp; <a href="https://app.nidhinn.online">NYDH QA ↗</a> &nbsp;·&nbsp; <a href="https://www.linkedin.com/in/nidhin-narayanan/">LinkedIn ↗</a> &nbsp;·&nbsp; <a href="mailto:nidhinxnarayanan@gmail.com">Email ↗</a></p>
 
 </div>
 
-## What I work on
+---
 
-- **Web and mobile testing:** functional, regression, exploratory, and end-to-end testing.
-- **Automation:** Appium for mobile; Selenium and Playwright for web; Jenkins for running test suites.
-- **API and accessibility:** API validation with Postman and accessibility testing with the JAWS screen reader.
-- **Building tools:** NYDH QA Workspace and other projects that make testing work smoother.
+## 01 / Selected work
 
-## My toolkit
+**[NYDH QA Workspace ↗](https://app.nidhinn.online)** — API testing, test cases, and practical QA utilities in one place.
 
-Appium · Selenium · Playwright · Postman · Jenkins · JAWS
+**[Accessibility Tester ↗](https://rbi-accessibility-tester.onrender.com)** — Playwright and axe-core checks with guided manual testing.
 
-## Featured work
+**[Site Checks ↗](https://github.com/eyesofnydh/Site-checks)** — A regression suite for responsive layouts, forms, and accessibility.
 
-- **[NYDH QA Workspace](https://app.nidhinn.online)** — a quality engineering workspace for API testing, test cases, JSON and JWT utilities, and site audits. [Source](https://github.com/eyesofnydh/nydh-new).
-- **[Accessibility Tester](https://rbi-accessibility-tester.onrender.com)** — Playwright and axe-core checks paired with guided manual accessibility testing.
-- **[Site Checks](https://github.com/eyesofnydh/Site-checks)** — a regression suite for navigation, forms, responsive layouts, and accessibility.
+<sub>Appium · Selenium · Playwright · Postman · Jenkins · JAWS</sub>
 
-## GitHub activity
+---
+
+## 02 / GitHub in motion
 
 <div align="center">
 
-<img src="./contrib-heatmap.svg" width="100%" alt="Nidhin's GitHub contribution activity, refreshed daily after publication" />
+<img src="./contrib-heatmap.svg" width="100%" alt="Nidhin's GitHub contribution map, updated daily" />
 
-<img src="./stats.svg" width="700" alt="Nidhin's GitHub contribution statistics, refreshed daily after publication" />
+<br />
+
+<img src="./stats.svg" width="700" alt="Nidhin's GitHub contribution statistics, updated daily" />
 
 </div>
 
-## Explore
+---
 
-- [Visit my portfolio](https://nidhinn.online) for my work and background.
-- [See more projects on GitHub](https://github.com/eyesofnydh?tab=repositories).
-- [Connect on LinkedIn](https://www.linkedin.com/in/nidhin-narayanan/) or [send me an email](mailto:nidhinxnarayanan@gmail.com).
-
-<!-- The graphics above start as neutral placeholders. The workflow at
-     .github/workflows/update-profile-art.yml replaces them with live data
-     for this repository's owner after the first successful run. -->
+<div align="center"><sub>Testing with curiosity. Building with intent.</sub></div>

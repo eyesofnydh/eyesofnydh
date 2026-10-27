@@ -3,8 +3,8 @@
 Render data/contributions.json (produced by fetch_contributions.py) as a proper
 GitHub-style contribution heatmap SVG: a grid of rounded, colored BOXES in the
 classic 53-week x 7-day calendar, revealed once with a diagonal line-after-line
-slide-down (CSS keyframes, plays on load then freezes -- no looping "glow"), a
-Less->More legend, and a real stats footer.
+slide-down (CSS keyframes, plays on load then freezes -- no looping "glow")
+and a compact Less->More legend.
 
 Run by .github/workflows/update-profile-art.yml after fetch_contributions.py.
 """
@@ -18,7 +18,7 @@ IN_PATH = os.path.join(HERE, "..", "data", "contributions.json")
 OUT_PATH = os.path.join(HERE, "..", "contrib-heatmap.svg")
 
 # GitHub-ish green ramp: empty -> brightest. Level 5 is a brighter neon top end.
-PALETTE = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353", "#69f0a0"]
+PALETTE = ["#14272b", "#0e4429", "#006d32", "#26a641", "#39d353", "#69f0a0"]
 
 CELL = 12
 GAP = 3
@@ -28,14 +28,13 @@ LEFT_LABEL_W = 30
 TOP_LABEL_H = 20
 TITLEBAR_H = 30
 
-BG = "#0a0e14"
-BG2 = "#0d1420"
-FRAME = "#1f6feb"
-MUTED = "#7d8590"
-TEXT = "#e6edf3"
-ACCENT = "#22d3ee"
+BG = "#09131c"
+BG2 = "#0b2630"
+FRAME = "#2b4c50"
+MUTED = "#9abbbd"
+TEXT = "#f2fbfa"
+ACCENT = "#4fe1d7"
 GREEN = "#39d353"
-GOLD = "#f2cc60"
 
 # reveal timing (one-shot)
 COL_T = 0.018   # per-column delay contribution (left -> right sweep)
@@ -101,7 +100,7 @@ def render(data):
                 month_labels.append((ci, date.strftime("%b")))
 
     canvas_w = PAD + LEFT_LABEL_W + art_w + PAD
-    stats_h = 88
+    stats_h = 70
     canvas_h = TITLEBAR_H + TOP_LABEL_H + art_h + stats_h + PAD
 
     css = f"""
@@ -129,7 +128,7 @@ def render(data):
     for i, dotcol in enumerate(["#ff5f56", "#ffbd2e", "#27c93f"]):
         parts.append(f'<circle cx="{PAD + i*16}" cy="{TITLEBAR_H/2}" r="5" fill="{dotcol}"/>')
     parts.append(f'<text x="{canvas_w/2}" y="{TITLEBAR_H/2 + 4}" fill="{MUTED}" font-size="12" '
-                 f'text-anchor="middle">{username}@github: ~/contributions --graph</text>')
+                 f'text-anchor="middle">{username}@github:~$ ./contributions</text>')
 
     grid_top = TITLEBAR_H + TOP_LABEL_H
     grid_left = PAD + LEFT_LABEL_W
@@ -171,26 +170,11 @@ def render(data):
     sep_y = leg_y + CELL + 14
     parts.append(f'<line x1="0" y1="{sep_y}" x2="{canvas_w}" y2="{sep_y}" stroke="{FRAME}" stroke-opacity="0.25"/>')
 
-    cs = data["current_streak"]["length"]
-    ls = data["longest_streak"]["length"]
-    total = data["total_contributions"]
-    best = data["best_day"]
     rng = data["range"]
-
-    ly = sep_y + 24
-    # left column: big highlighted numbers; right column: context in muted
-    parts.append(f'<text x="{PAD}" y="{ly}" font-size="13" fill="{GREEN}">'
-                 f'<tspan font-weight="700">{total:,}</tspan>'
-                 f'<tspan fill="{MUTED}"> contributions in the last year</tspan></text>')
-    parts.append(f'<text x="{canvas_w - PAD}" y="{ly}" font-size="12" fill="{MUTED}" text-anchor="end">'
-                 f'{rng["start"]} &#8594; {rng["end"]}</text>')
-    ly += 24
-    parts.append(f'<text x="{PAD}" y="{ly}" font-size="13" fill="{MUTED}">current streak '
-                 f'<tspan fill="{ACCENT}" font-weight="700">{cs} days</tspan>'
-                 f'<tspan fill="{MUTED}">   &#183;   longest </tspan>'
-                 f'<tspan fill="{ACCENT}" font-weight="700">{ls} days</tspan></text>')
-    parts.append(f'<text x="{canvas_w - PAD}" y="{ly}" font-size="12" fill="{MUTED}" text-anchor="end">'
-                 f'best day <tspan fill="{GOLD}" font-weight="700">{best["count"]}</tspan> on {best["date"]}</text>')
+    parts.append(f'<text x="{PAD}" y="{sep_y + 30}" font-size="15" fill="{GREEN}" '
+                 f'font-weight="700">CONTRIBUTION MAP</text>')
+    parts.append(f'<text x="{canvas_w - PAD}" y="{sep_y + 30}" font-size="13" fill="{MUTED}" '
+                 f'text-anchor="end">{rng["start"]} &#8594; {rng["end"]}</text>')
 
     parts.append("</svg>")
     return "".join(parts)
