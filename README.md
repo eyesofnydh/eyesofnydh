@@ -35,7 +35,7 @@ Appium · Selenium · Playwright · Postman · Jenkins · JAWS
 
 <img src="./contrib-heatmap.svg" width="100%" alt="Nidhin's GitHub contribution activity, refreshed daily after publication" />
 
-<img src="./stats.svg" width="62%" alt="Nidhin's GitHub contribution statistics, refreshed daily after publication" />
+<img src="./stats.svg" width="700" alt="Nidhin's GitHub contribution statistics, refreshed daily after publication" />
 
 </div>
 
