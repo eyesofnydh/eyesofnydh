@@ -194,7 +194,6 @@ def weekly_bars(parts, data, x, y, width, height, mobile=False):
 def desktop(parts, data, encoded):
     w, h = 1200, 1080
     parts.append(rect(0, 0, w, h, "url(#background)", 25, LINE))
-    parts.append(rect(0, 0, 7, h, "url(#edge)", 3))
     parts.append(f'<path d="M0 64H{w}" stroke="{LINE}"/>')
     parts.append(rect(42, 21, 25, 25, TEAL, 6))
     parts.append(text(54, 38, "N", 16, INK, 900, SANS, "middle"))
@@ -241,7 +240,6 @@ def desktop(parts, data, encoded):
 def mobile(parts, data, encoded):
     w, h = 560, 1800
     parts.append(rect(0, 0, w, h, "url(#background)", 23, LINE))
-    parts.append(rect(0, 0, 6, h, "url(#edge)", 3))
     parts.append(f'<path d="M0 64H{w}" stroke="{LINE}"/>')
     parts.append(rect(26, 21, 25, 25, TEAL, 6))
     parts.append(text(38, 38, "N", 16, INK, 900, SANS, "middle"))
@@ -328,9 +326,6 @@ def render(data, encoded, mobile_view=False):
         '<radialGradient id="background" cx="78%" cy="20%" r="90%">'
         '<stop stop-color="#12333a"/><stop offset=".55" stop-color="#0d1b23"/>'
         '<stop offset="1" stop-color="#0a1016"/></radialGradient>'
-        '<linearGradient id="edge" x2="0" y2="1">'
-        '<stop stop-color="#55ddd0"/><stop offset=".52" stop-color="#48d870"/>'
-        '<stop offset="1" stop-color="#ff9b7e"/></linearGradient>'
         '<linearGradient id="sweep-gradient" x1="0" y1="0" x2="1" y2="0">'
         '<stop stop-color="#39d353" stop-opacity="0"/>'
         '<stop offset=".35" stop-color="#39d353" stop-opacity=".10"/>'
