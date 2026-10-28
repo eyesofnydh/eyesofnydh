@@ -1,290 +1,324 @@
 #!/usr/bin/env python3
-"""Build the profile dashboard from public GitHub activity and a static avatar portrait."""
+"""Render a polished, animated GitHub profile visual from public activity data."""
 
+import base64
 import datetime as dt
 import html
 import json
-import os
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data" / "contributions.json"
-PORTRAIT = ROOT / "assets" / "avatar-ascii.txt"
-
-BG = "#0d1117"
-PANEL = "#10151d"
-CARD = "#161b22"
-LINE = "#30363d"
-WHITE = "#e6edf3"
-MUTED = "#8b949e"
-GREEN = "#3fb950"
-DIM_GREEN = "#238636"
-RAMP = ["#161f22", "#0e4429", "#006d32", "#26a641", "#39d353", "#69f0a0"]
+INK = "#0a1016"
+SURFACE = "#101b22"
+SURFACE_2 = "#14242b"
+LINE = "#244049"
+TEXT = "#f3f8f7"
+MUTED = "#9ab4b8"
+TEAL = "#55ddd0"
+GREEN = "#48d870"
+LIME = "#b4ef73"
+CORAL = "#ff9b7e"
+RAMP = ["#183039", "#164d3e", "#158056", "#22a662", "#36cd6d", "#7aec9b"]
+SANS = "Segoe UI,Arial,sans-serif"
 MONO = "Consolas,Menlo,monospace"
 
 
-def esc(value):
+def e(value):
     return html.escape(str(value), quote=True)
 
 
-def short(date_string):
-    if not date_string:
-        return "—"
-    day = dt.date.fromisoformat(date_string)
-    return f"{day:%b} {day.day}"
-
-
-def streak_range(streak):
-    if not streak["length"]:
-        return "Start a new run"
-    if streak["start"] == streak["end"]:
-        return short(streak["end"])
-    return f'{short(streak["start"])} – {short(streak["end"])}'
-
-
-def rect(x, y, w, h, fill, radius=0, stroke=None, more=""):
+def rect(x, y, w, h, fill, radius=0, stroke=None, extra=""):
     border = f' stroke="{stroke}"' if stroke else ""
     return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{radius}" '
-            f'fill="{fill}"{border} {more}/>')
+            f'fill="{fill}"{border} {extra}/>')
 
 
-def label(x, y, content, size=14, color=WHITE, weight=400, anchor="start", more=""):
-    return (f'<text x="{x}" y="{y}" fill="{color}" font-family="{MONO}" '
+def text(x, y, value, size, color=TEXT, weight=400, family=SANS, anchor="start", extra=""):
+    return (f'<text x="{x}" y="{y}" fill="{color}" font-family="{family}" '
             f'font-size="{size}" font-weight="{weight}" text-anchor="{anchor}" '
-            f'{more}>{esc(content)}</text>')
+            f'{extra}>{e(value)}</text>')
 
 
-def grid_for(days):
-    """Sunday-first calendar columns, including the partial first and last weeks."""
-    columns = []
-    first = dt.date.fromisoformat(days[0]["date"])
-    column = [None] * ((first.weekday() + 1) % 7)
+def first_sunday(date):
+    return date - dt.timedelta(days=(date.weekday() + 1) % 7)
+
+
+def grid(days):
+    weeks = []
+    current = []
+    last_start = None
     for day in days:
         date = dt.date.fromisoformat(day["date"])
-        weekday = (date.weekday() + 1) % 7
-        while len(column) < weekday:
-            column.append(None)
-        column.append(day)
-        if len(column) == 7:
-            columns.append(column)
-            column = []
-    if column:
-        columns.append(column + [None] * (7 - len(column)))
-    return columns
+        start = first_sunday(date)
+        if start != last_start:
+            if current:
+                weeks.append(current)
+            current = [None] * ((date.weekday() + 1) % 7)
+            last_start = start
+        current.append(day)
+    if current:
+        weeks.append(current + [None] * (7 - len(current)))
+    return weeks
 
 
-def level(day):
+def intensity(day):
     count = day["count"]
     if count == 0:
         return 0
-    if count <= 5:
+    if count <= 3:
         return 1
-    if count <= 15:
+    if count <= 8:
         return 2
-    if count <= 30:
+    if count <= 15:
         return 3
-    if count <= 50:
+    if count <= 25:
         return 4
     return 5
 
 
+def date_short(value):
+    if not value:
+        return "Ready for the next run"
+    date = dt.date.fromisoformat(value)
+    return f"{date:%b} {date.day}"
+
+
+def streak_description(item):
+    if not item["length"]:
+        return "Ready for the next run"
+    if item["start"] == item["end"]:
+        return date_short(item["end"])
+    return f'{date_short(item["start"])} – {date_short(item["end"])}'
+
+
+def chrome(parts, x, y, width, command):
+    parts.append(f'<path d="M{x} {y+42}H{x+width}" stroke="{LINE}"/>')
+    for index, color in enumerate((CORAL, "#f8ca71", GREEN)):
+        parts.append(f'<circle cx="{x+20+index*15}" cy="{y+21}" r="4" fill="{color}"/>')
+    parts.append(text(x + width / 2, y + 27, command, 11, MUTED, 500, MONO, "middle"))
+
+
 def heatmap(parts, data, mobile):
-    columns = grid_for(data["days"])
+    weeks = grid(data["days"])
     if mobile:
-        columns = columns[-26:]
-    x0, y0, step, cell = (47, 54, 16, 13) if mobile else (63, 52, 18, 15)
+        weeks = weeks[-26:]
+    x0, y0, step, cell = (69, 165, 17, 13) if mobile else (81, 182, 20, 16)
     seen = set()
-    months = []
-    for ci, column in enumerate(columns):
-        for day in column:
+    month_labels = []
+    for index, week in enumerate(weeks):
+        for day in week:
             if day:
                 date = dt.date.fromisoformat(day["date"])
-                month = (date.year, date.month)
-                if month not in seen:
-                    seen.add(month)
-                    months.append((ci, date.strftime("%b")))
+                key = (date.year, date.month)
+                if key not in seen:
+                    seen.add(key)
+                    month_labels.append((index, date.strftime("%b").upper()))
                 break
-        for ri, day in enumerate(column):
-            if day is None:
+        for row, day in enumerate(week):
+            if not day:
                 continue
-            x, y = x0 + ci * step, y0 + ri * step
-            delay = ci * (0.022 if mobile else 0.012) + ri * 0.015
+            x, y = x0 + index * step, y0 + row * step
+            delay = (0.12 + index * (0.022 if mobile else 0.012) + row * 0.013)
             count = day["count"]
-            suffix = "" if count == 1 else "s"
+            plural = "" if count == 1 else "s"
             parts.append(
-                f'<rect class="cell" x="{x}" y="{y}" width="{cell}" height="{cell}" '
-                f'rx="3" fill="{RAMP[level(day)]}" style="animation-delay:{delay:.3f}s">'
-                f'<title>{day["date"]}: {count} contribution{suffix}</title></rect>'
+                f'<rect class="day" x="{x}" y="{y}" width="{cell}" height="{cell}" '
+                f'rx="3" fill="{RAMP[intensity(day)]}" style="animation-delay:{delay:.3f}s">'
+                f'<title>{day["date"]}: {count} contribution{plural}</title></rect>'
             )
-    for index, (ci, month) in enumerate(months):
-        if index + 1 < len(months) and months[index + 1][0] - ci < 3:
+    for i, (index, month) in enumerate(month_labels):
+        if i + 1 < len(month_labels) and month_labels[i + 1][0] - index < 3:
             continue
-        parts.append(label(x0 + ci * step, y0 - 16, month,
-                           11 if mobile else 13, MUTED, 600))
-    for row, text in ((1, "Mon"), (3, "Wed"), (5, "Fri")):
-        parts.append(label(25 if mobile else 24, y0 + row * step + cell - 3,
-                           text, 11 if mobile else 13, MUTED))
-    summary_y = 198 if mobile else 218
-    parts.append(label(x0, summary_y,
-                       f'{data["total_contributions"]:,} contributions in the last year',
-                       16 if mobile else 19, WHITE, 700))
-    if mobile:
-        parts.append(label(468, summary_y, "RECENT 26 WEEKS", 10, MUTED, 500, "end"))
+        parts.append(text(x0 + index * step, y0 - 13, month, 11, MUTED, 600, MONO))
+    for row, name in ((1, "MON"), (3, "WED"), (5, "FRI")):
+        parts.append(text(25 if mobile else 32, y0 + row * step + cell - 3,
+                          name, 10 if mobile else 11, MUTED, 500, MONO))
 
 
-def terminal_frame(parts, x, y, width, height, command):
-    parts.append(rect(x, y, width, height, PANEL, 8, LINE))
-    parts.append(f'<path d="M{x} {y+33}H{x+width}" stroke="{LINE}"/>')
-    for i, color in enumerate(("#ff5f56", "#ffbd2e", "#27c93f")):
-        parts.append(f'<circle cx="{x+16+i*11}" cy="{y+17}" r="3" fill="{color}"/>')
-    parts.append(label(x + width / 2, y + 21, command, 10, MUTED, 400, "middle"))
+def avatar(parts, encoded, x, y, size, clip_id):
+    parts.append(f'<clipPath id="{clip_id}">{rect(x, y, size, size, "white", 18)}</clipPath>')
+    parts.append(rect(x-2, y-2, size+4, size+4, "none", 20, LINE))
+    parts.append(
+        f'<image class="avatar" x="{x}" y="{y}" width="{size}" height="{size}" '
+        f'clip-path="url(#{clip_id})" href="data:image/jpeg;base64,{encoded}" '
+        f'preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated"/>'
+    )
+    parts.append(rect(x+size-117, y+size-42, 103, 27, INK, 7, TEAL))
+    parts.append(text(x+size-65, y+size-24, "NN // 01", 12, TEAL, 700, MONO, "middle"))
 
 
-def portrait(parts, data, mobile):
-    x, y, width, height = (15, 289, 470, 555) if mobile else (24, 324, 516, 646)
-    terminal_frame(parts, x, y, width, height,
-                   f'{data["username"]}@github:~$ ./portrait.sh')
-    lines = PORTRAIT.read_text(encoding="utf-8-sig").splitlines()
-    baseline = y + (55 if mobile else 62)
-    line_step = 9.0 if mobile else 10.35
-    text_x = x + (36 if mobile else 36)
-    font_size = 8.6 if mobile else 9.3
-    for row, line in enumerate(lines):
-        if not line.strip():
-            continue
-        delay = 0.30 + row * 0.025
-        parts.append(
-            f'<text class="portrait-line" x="{text_x}" y="{baseline+row*line_step:.1f}" '
-            f'fill="{WHITE}" opacity="0.82" font-family="{MONO}" font-size="{font_size}" '
-            f'xml:space="preserve" style="animation-delay:{delay:.3f}s">'
-            f'{esc(line)}</text>'
-        )
-    footer_y = y + height - 41
-    parts.append(f'<path d="M{x} {footer_y}H{x+width}" stroke="{LINE}"/>')
-    parts.append(label(x + 15, footer_y + 26,
-                       "NIDHIN NARAYANAN  /  TESTING ENGINEER",
-                       11 if mobile else 12, WHITE, 700))
-    parts.append(label(x + width - 15, footer_y + 26, "WEBANDCRAFTS",
-                       9 if mobile else 10, MUTED, 500, "end"))
+def metric(parts, x, y, w, label, value, note, index, highlight=False, mobile=False):
+    parts.append(f'<g class="metric" style="animation-delay:{0.62+index*0.10:.2f}s">')
+    parts.append(rect(x, y, w, 91 if mobile else 82, SURFACE, 11, LINE))
+    parts.append(rect(x, y, 4, 91 if mobile else 82, GREEN if highlight else TEAL, 2))
+    parts.append(text(x + 19, y + 25, label.upper(), 11, MUTED, 700, MONO))
+    parts.append(text(x + 19, y + (61 if mobile else 58), value, 30 if mobile else 28,
+                      LIME if highlight else TEXT, 800))
+    parts.append(text(x + w - 14, y + (59 if mobile else 55), note,
+                      11 if mobile else 10, MUTED, 400, MONO, "end"))
+    parts.append('</g>')
 
 
-def metrics(data):
-    active = data["active_days"]
-    return [
-        ("$ current streak", str(data["current_streak"]["length"]),
-         "days", streak_range(data["current_streak"]), GREEN),
-        ("$ longest streak", str(data["longest_streak"]["length"]),
-         "days", streak_range(data["longest_streak"]), WHITE),
-        ("$ contributions", f'{data["total_contributions"]:,}',
-         "", "in the last year", WHITE),
-        ("$ active days", str(active),
-         "days", "in the last year", WHITE),
-        ("$ best day", str(data["best_day"]["count"]),
-         "", short(data["best_day"]["date"]), WHITE),
-        ("$ avg / active day", f'{data["avg_per_active_day"]:.1f}',
-         "", "contributions", WHITE),
-    ]
+def weekly_bars(parts, data, x, y, width, height, mobile=False):
+    parts.append(rect(x, y, width, height, SURFACE, 13, LINE))
+    parts.append(text(x + 20, y + 30, "THE RECENT RUN", 13, TEXT, 800, MONO))
+    parts.append(text(x + width - 20, y + 30, "LAST 12 WEEKS", 11, MUTED, 600, MONO, "end"))
+    weeks = grid(data["days"])[-12:]
+    totals = [sum(day["count"] for day in week if day) for week in weeks]
+    max_total = max(totals) or 1
+    base = y + height - 34
+    max_height = height - 78
+    plot_left = x + 22
+    step = (width - 44) / len(weeks)
+    bar_width = 22 if mobile else 27
+    for i, total in enumerate(totals):
+        center = plot_left + (i + 0.5) * step
+        bar_height = max(3, round(total / max_total * max_height)) if total else 2
+        bx, by = center - bar_width / 2, base - bar_height
+        color = GREEN if total else "#2b4148"
+        parts.append(rect(f'{bx:.1f}', f'{by:.1f}', bar_width, bar_height, color, 4,
+                          extra=f'class="bar" style="animation-delay:{0.85+i*0.075:.2f}s"'))
+        if total and total >= max_total * 0.3:
+            parts.append(text(f'{center:.1f}', by - 7, str(total), 10,
+                              TEXT, 700, MONO, "middle"))
+        if i in (0, 4, 8, 11):
+            day = next((item["date"] for item in weeks[i] if item), None)
+            if day:
+                date = dt.date.fromisoformat(day)
+                parts.append(text(f'{center:.1f}', base + 22, date.strftime("%b %d"),
+                                  10, MUTED, 500, MONO, "middle"))
 
 
-def stats(parts, data, mobile):
-    x, y, width, height = (15, 860, 470, 620) if mobile else (558, 324, 518, 646)
-    terminal_frame(parts, x, y, width, height,
-                   f'{data["username"]}@github:~$ ./stats.sh')
-    pad, gap = (15, 11) if mobile else (16, 10)
-    tile_width = (width - 2 * pad - gap) / 2
-    tile_height = 91 if mobile else 96
-    start_y = y + 43
-    for index, (name, value, unit, caption, color) in enumerate(metrics(data)):
-        col, row = index % 2, index // 2
-        tx = x + pad + col * (tile_width + gap)
-        ty = start_y + row * (tile_height + 9)
-        delay = 0.20 + index * 0.10
-        parts.append(f'<g class="metric" style="animation-delay:{delay:.2f}s">')
-        parts.append(rect(tx, ty, tile_width, tile_height, CARD, 7, LINE))
-        parts.append(label(tx + 12, ty + 22, name,
-                           12 if mobile else 13, MUTED, 500))
-        parts.append(label(tx + 12, ty + 60, value,
-                           32 if len(value) <= 4 else 28, color, 800))
-        # Keep the unit clear of the number even when the count grows.
-        unit_x = tx + 16 + min(len(value), 7) * (20 if len(value) <= 4 else 17)
-        if unit:
-            parts.append(label(unit_x, ty + 58, unit, 12, MUTED, 400))
-        parts.append(label(tx + 12, ty + tile_height - 11, caption, 11, MUTED))
-        parts.append('</g>')
-    chart_y = start_y + 3 * (tile_height + 9) + 1
-    chart_h = y + height - chart_y - 16
-    chart_x = x + pad
-    chart_w = width - 2 * pad
-    parts.append(rect(chart_x, chart_y, chart_w, chart_h, CARD, 7, LINE))
-    parts.append(label(chart_x + 14, chart_y + 25, "$ contributions / month",
-                       12 if mobile else 13, MUTED, 500))
-    monthly = data["monthly"][-13:]
-    highest = max((m["total"] for m in monthly), default=1) or 1
-    bar_base = chart_y + chart_h - 62
-    max_h = chart_h - 115
-    bar_gap = (chart_w - 40) / len(monthly)
-    bar_width = 17 if mobile else 22
-    for index, month in enumerate(monthly):
-        center = chart_x + 20 + (index + 0.5) * bar_gap
-        total = month["total"]
-        bar_h = max(3, round(max_h * total / highest)) if total else 2
-        bx = center - bar_width / 2
-        by = bar_base - bar_h
-        color = GREEN if total else "#303a43"
-        parts.append(rect(f'{bx:.1f}', f'{by:.1f}', bar_width, bar_h, color, 2,
-                          more=f'class="bar" style="animation-delay:{0.55+index*0.055:.2f}s"'))
-        if total and (total >= highest * 0.12 or total == highest):
-            parts.append(label(f'{center:.1f}', by - 7, str(total), 10, WHITE, 700, "middle"))
-        month_letter = dt.date.fromisoformat(month["month"] + "-01").strftime("%b")[0]
-        parts.append(label(f'{center:.1f}', bar_base + 19, month_letter, 11, MUTED, 500, "middle"))
-    parts.append(label(chart_x + 14, chart_y + chart_h - 10,
-                       "REAL PUBLIC GITHUB ACTIVITY", 9, MUTED))
-    parts.append(label(chart_x + chart_w - 14, chart_y + chart_h - 10,
-                       "UPDATED DAILY", 9, MUTED, 400, "end"))
+def desktop(parts, data, encoded):
+    w, h = 1200, 1080
+    parts.append(rect(0, 0, w, h, "url(#background)", 25, LINE))
+    parts.append(rect(0, 0, 7, h, "url(#edge)", 3))
+    parts.append(f'<path d="M0 64H{w}" stroke="{LINE}"/>')
+    parts.append(rect(42, 21, 25, 25, TEAL, 6))
+    parts.append(text(54, 38, "N", 16, INK, 900, SANS, "middle"))
+    parts.append(text(80, 40, "NIDHIN  /  QUALITY ENGINEERING", 13, TEXT, 700, MONO))
+    parts.append(text(1150, 40, "GITHUB  ·  EYESOFNYDH", 12, MUTED, 600, MONO, "end"))
+
+    parts.append(text(50, 119, "01 / ACTIVITY TIMELINE", 13, TEAL, 700, MONO))
+    parts.append(text(1150, 119, f'{data["total_contributions"]:,} CONTRIBUTIONS THIS YEAR',
+                      13, TEXT, 700, MONO, "end"))
+    heatmap(parts, data, False)
+    parts.append(f'<path d="M50 342H1150" stroke="{LINE}"/>')
+
+    px, py, pw, ph = 50, 373, 510, 657
+    parts.append(rect(px, py, pw, ph, SURFACE, 16, LINE))
+    chrome(parts, px, py, pw, "eyesofnydh@github:~$ ./portrait")
+    avatar(parts, encoded, px + 17, py + 59, 476, "portrait-desktop")
+    parts.append(f'<path d="M{px} {py+570}H{px+pw}" stroke="{LINE}"/>')
+    parts.append(text(px + 22, py + 605, "THE PERSON BEHIND THE TESTS", 13, TEAL, 700, MONO))
+    parts.append(text(px + 22, py + 636, "Curious by default. Precise by practice.", 18, TEXT, 500))
+
+    rx = 605
+    parts.append(text(rx, 401, "02 / WHO AM I", 13, TEAL, 700, MONO))
+    parts.append(text(rx, 487, "Nidhin", 82, TEXT, 800))
+    parts.append(text(rx, 572, "Narayanan", 72, TEXT, 800))
+    parts.append(rect(rx, 593, 55, 5, CORAL, 2))
+    parts.append(text(rx, 634, "Testing Engineer at Webandcrafts", 23, TEXT, 600))
+    parts.append(text(rx, 669, "I find the cracks before release, then make", 17, MUTED, 400))
+    parts.append(text(rx, 694, "the useful lessons repeatable.", 17, MUTED, 400))
+
+    metric(parts, rx, 727, 260, "Contributions", f'{data["total_contributions"]:,}',
+           "last year", 0, highlight=True)
+    metric(parts, rx + 275, 727, 260, "Active days", str(data["active_days"]),
+           "days", 1)
+    metric(parts, rx, 820, 260, "Current streak", str(data["current_streak"]["length"]),
+           "days", 2)
+    metric(parts, rx + 275, 820, 260, "Longest streak", str(data["longest_streak"]["length"]),
+           "days", 3)
+    weekly_bars(parts, data, rx, 913, 535, 117)
+    return w, h
 
 
-def render(data, mobile=False):
-    width, height = (500, 1496) if mobile else (1100, 994)
-    username = esc(data["username"])
+def mobile(parts, data, encoded):
+    w, h = 560, 1800
+    parts.append(rect(0, 0, w, h, "url(#background)", 23, LINE))
+    parts.append(rect(0, 0, 6, h, "url(#edge)", 3))
+    parts.append(f'<path d="M0 64H{w}" stroke="{LINE}"/>')
+    parts.append(rect(26, 21, 25, 25, TEAL, 6))
+    parts.append(text(38, 38, "N", 16, INK, 900, SANS, "middle"))
+    parts.append(text(64, 40, "NIDHIN / QA", 13, TEXT, 700, MONO))
+    parts.append(text(534, 40, "GITHUB  ·  LIVE", 12, MUTED, 600, MONO, "end"))
+
+    parts.append(text(28, 106, "01 / ACTIVITY TIMELINE", 12, TEAL, 700, MONO))
+    parts.append(text(533, 106, f'{data["total_contributions"]:,} THIS YEAR',
+                      12, TEXT, 700, MONO, "end"))
+    heatmap(parts, data, True)
+    parts.append(text(69, 308, "RECENT 26 WEEKS  /  REAL PUBLIC ACTIVITY", 11, MUTED, 600, MONO))
+    parts.append(f'<path d="M28 337H532" stroke="{LINE}"/>')
+
+    parts.append(text(30, 383, "02 / WHO AM I", 12, TEAL, 700, MONO))
+    parts.append(text(30, 454, "Nidhin", 73, TEXT, 800))
+    parts.append(text(30, 528, "Narayanan", 67, TEXT, 800))
+    parts.append(rect(30, 549, 52, 5, CORAL, 2))
+    parts.append(text(30, 592, "Testing Engineer at Webandcrafts", 21, TEXT, 600))
+    parts.append(text(30, 627, "I find the cracks before release, then", 16, MUTED))
+    parts.append(text(30, 651, "make the useful lessons repeatable.", 16, MUTED))
+
+    px, py, pw, ph = 30, 684, 500, 545
+    parts.append(rect(px, py, pw, ph, SURFACE, 16, LINE))
+    chrome(parts, px, py, pw, "eyesofnydh@github:~$ ./portrait")
+    avatar(parts, encoded, px + 16, py + 58, 468, "portrait-mobile")
+    parts.append(f'<path d="M{px} {py+535}H{px+pw}" stroke="{LINE}"/>')
+
+    metric(parts, 30, 1255, 243, "Contributions", f'{data["total_contributions"]:,}',
+           "last year", 0, highlight=True, mobile=True)
+    metric(parts, 287, 1255, 243, "Active days", str(data["active_days"]),
+           "days", 1, mobile=True)
+    metric(parts, 30, 1359, 243, "Current streak", str(data["current_streak"]["length"]),
+           "days", 2, mobile=True)
+    metric(parts, 287, 1359, 243, "Longest streak", str(data["longest_streak"]["length"]),
+           "days", 3, mobile=True)
+    weekly_bars(parts, data, 30, 1480, 500, 273, True)
+    return w, h
+
+
+def render(data, encoded, mobile_view=False):
+    w, h = (560, 1800) if mobile_view else (1200, 1080)
     css = """
-    @keyframes cell-in { from {opacity:0;transform:translateY(-6px)} to {opacity:1;transform:translateY(0)} }
-    @keyframes line-in { from {opacity:0;transform:translateY(4px)} to {opacity:.82;transform:translateY(0)} }
-    @keyframes rise-in { from {opacity:0;transform:translateY(12px)} to {opacity:1;transform:translateY(0)} }
-    @keyframes bar-in { from {opacity:0;transform:scaleY(0)} to {opacity:1;transform:scaleY(1)} }
-    .cell {animation:cell-in .38s ease-out both}
-    .portrait-line {animation:line-in .38s ease-out both}
-    .metric {animation:rise-in .55s ease-out both}
-    .bar {transform-box:fill-box;transform-origin:center bottom;animation:bar-in .72s ease-out both}
-    @media (prefers-reduced-motion:reduce) {
-      .cell,.portrait-line,.metric,.bar {animation:none}
-    }
+      @keyframes reveal-day {from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes enter {from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes portrait-in {from{opacity:0;transform:scale(1.045)}to{opacity:1;transform:scale(1)}}
+      @keyframes grow {from{opacity:0;transform:scaleY(0)}to{opacity:1;transform:scaleY(1)}}
+      .day {animation:reveal-day .4s ease-out both}
+      .avatar {transform-box:fill-box;transform-origin:center;animation:portrait-in .95s cubic-bezier(.2,.8,.2,1) .25s both}
+      .metric {animation:enter .55s ease-out both}
+      .bar {transform-box:fill-box;transform-origin:center bottom;animation:grow .6s ease-out both}
+      @media (prefers-reduced-motion:reduce) {.day,.avatar,.metric,.bar {animation:none}}
     """
     parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
-        f'viewBox="0 0 {width} {height}" role="img">',
-        f'<title>Nidhin Narayanan — GitHub profile dashboard</title>',
-        f'<desc>Real GitHub contribution calendar and statistics for {username}, '
-        f'with a text portrait based on Nidhin’s GitHub avatar.</desc>',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" '
+        f'viewBox="0 0 {w} {h}" role="img">',
+        '<title>Nidhin Narayanan — quality engineer and GitHub activity</title>',
+        f'<desc>Profile portrait and real GitHub activity for {e(data["username"])}: '
+        f'{data["total_contributions"]:,} contributions and {data["active_days"]} active days.</desc>',
         f'<style>{css}</style>',
-        rect(0, 0, width, height, BG),
+        '<defs>'
+        '<radialGradient id="background" cx="78%" cy="20%" r="90%">'
+        '<stop stop-color="#12333a"/><stop offset=".55" stop-color="#0d1b23"/>'
+        '<stop offset="1" stop-color="#0a1016"/></radialGradient>'
+        '<linearGradient id="edge" x2="0" y2="1">'
+        '<stop stop-color="#55ddd0"/><stop offset=".52" stop-color="#48d870"/>'
+        '<stop offset="1" stop-color="#ff9b7e"/></linearGradient>'
+        '</defs>',
     ]
-    heatmap(parts, data, mobile)
-    pill_x, pill_y, pill_w = (63, 232, 374) if mobile else (354, 259, 392)
-    parts.append(rect(pill_x, pill_y, pill_w, 42, CARD, 8))
-    parts.append(label(width / 2, pill_y + 28,
-                       f'{data["username"]}@github ~ $ whoami',
-                       20 if mobile else 23, WHITE, 800, "middle"))
-    portrait(parts, data, mobile)
-    stats(parts, data, mobile)
+    if mobile_view:
+        mobile(parts, data, encoded)
+    else:
+        desktop(parts, data, encoded)
     parts.append('</svg>')
     return ''.join(parts)
 
 
 if __name__ == "__main__":
-    with DATA.open(encoding="utf-8") as file:
-        data = json.load(file)
-    for mobile, name in ((False, "dashboard.svg"), (True, "dashboard-mobile.svg")):
-        target = ROOT / name
-        target.write_text(render(data, mobile), encoding="utf-8")
-        print(f"wrote {target.name} ({target.stat().st_size // 1024} KB)")
+    data = json.loads((ROOT / "data" / "contributions.json").read_text(encoding="utf-8"))
+    encoded_avatar = base64.b64encode((ROOT / "assets" / "avatar.jpg").read_bytes()).decode("ascii")
+    for mobile_view, name in ((False, "dashboard.svg"), (True, "dashboard-mobile.svg")):
+        output = ROOT / name
+        output.write_text(render(data, encoded_avatar, mobile_view), encoding="utf-8")
+        print(f"wrote {name} ({output.stat().st_size // 1024} KB)")
