@@ -197,7 +197,7 @@ def desktop(parts, data, encoded):
     parts.append(f'<path d="M0 64H{w}" stroke="{LINE}"/>')
     parts.append(rect(42, 21, 25, 25, TEAL, 6))
     parts.append(text(54, 38, "N", 16, INK, 900, SANS, "middle"))
-    enter_text(parts, 0.08, 80, 40, "NIDHIN  /  QUALITY ENGINEERING", 13, TEXT, 700, MONO)
+    enter_text(parts, 0.08, 80, 40, "NIDHIN  /  TESTING ENGINEER", 13, TEXT, 700, MONO)
     enter_text(parts, 0.12, 1150, 40, "GITHUB  ·  EYESOFNYDH", 12, MUTED, 600, MONO, "end")
 
     enter_text(parts, 0.16, 50, 119, "01 / ACTIVITY TIMELINE", 13, TEAL, 700, MONO)
@@ -243,7 +243,7 @@ def mobile(parts, data, encoded):
     parts.append(f'<path d="M0 64H{w}" stroke="{LINE}"/>')
     parts.append(rect(26, 21, 25, 25, TEAL, 6))
     parts.append(text(38, 38, "N", 16, INK, 900, SANS, "middle"))
-    enter_text(parts, 0.08, 64, 40, "NIDHIN / QA", 13, TEXT, 700, MONO)
+    enter_text(parts, 0.08, 64, 40, "NIDHIN / TESTING ENGINEER", 13, TEXT, 700, MONO)
     enter_text(parts, 0.12, 534, 40, "GITHUB  ·  LIVE", 12, MUTED, 600, MONO, "end")
 
     enter_text(parts, 0.16, 28, 106, "01 / ACTIVITY TIMELINE", 12, TEAL, 700, MONO)
@@ -318,7 +318,7 @@ def render(data, encoded, mobile_view=False):
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" '
         f'viewBox="0 0 {w} {h}" role="img">',
-        '<title>Nidhin Narayanan — quality engineer and GitHub activity</title>',
+        '<title>Nidhin Narayanan — Testing Engineer and GitHub activity</title>',
         f'<desc>Profile portrait and real GitHub activity for {e(data["username"])}: '
         f'{data["total_contributions"]:,} contributions and {data["active_days"]} active days.</desc>',
         f'<style>{css}</style>',

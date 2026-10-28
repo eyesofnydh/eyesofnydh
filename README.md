@@ -5,7 +5,11 @@
   <img src="./dashboard.svg" width="100%" alt="Nidhin Narayanan's profile: a contribution timeline, pixel art avatar, live statistics, and recent activity" />
 </picture>
 
-<p><a href="https://nidhinn.online">Portfolio ↗</a> &nbsp;·&nbsp; <a href="https://app.nidhinn.online">NYDH QA ↗</a> &nbsp;·&nbsp; <a href="https://www.linkedin.com/in/nidhin-narayanan/">LinkedIn ↗</a> &nbsp;·&nbsp; <a href="mailto:nidhinxnarayanan@gmail.com">Email ↗</a></p>
+<p>
+  <a href="https://nidhinn.online"><img src="./assets/portfolio-button.svg" width="210" alt="Open Nidhin's portfolio" /></a>
+  <a href="https://www.linkedin.com/in/nidhin-narayanan/"><img src="./assets/linkedin-button.svg" width="210" alt="Connect with Nidhin on LinkedIn" /></a>
+  <a href="mailto:nidhinxnarayanan@gmail.com"><img src="./assets/email-button.svg" width="210" alt="Email Nidhin" /></a>
+</p>
 
 <sub>Appium · Selenium · Playwright · Postman · Jenkins · JAWS</sub>
 
